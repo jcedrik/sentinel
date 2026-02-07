@@ -1,0 +1,5 @@
+sentinel
+test_ac
+test_engine
+*.o
+*.out
