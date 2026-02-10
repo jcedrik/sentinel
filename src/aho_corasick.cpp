@@ -1,5 +1,6 @@
 #include "aho_corasick.hpp"
 
+#include <queue>
 #include <stdexcept>
 
 namespace sentinel {
@@ -53,9 +54,15 @@ void AhoCorasick::build() {
 }
 
 std::vector<Match> AhoCorasick::search(std::string_view text) const {
-    // TODO actually implement matching
+    if (!built_) throw std::logic_error("search before build");
     std::vector<Match> matches;
-    (void)text;
+    int cur = root();
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        unsigned char ch = static_cast<unsigned char>(text[i]);
+        while (cur != root() && nodes_[cur].next[ch] == -1) cur = nodes_[cur].fail;
+        if (nodes_[cur].next[ch] != -1) cur = nodes_[cur].next[ch];
+        for (std::size_t pid : nodes_[cur].output) matches.push_back(Match{pid, i});
+    }
     return matches;
 }
 
