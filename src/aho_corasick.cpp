@@ -1,6 +1,5 @@
 #include "aho_corasick.hpp"
 
-#include <iostream>
 #include <queue>
 #include <stdexcept>
 
@@ -90,7 +89,6 @@ std::vector<Match> AhoCorasick::search(std::string_view text) const {
     for (std::size_t i = 0; i < text.size(); ++i) {
         unsigned char ch = static_cast<unsigned char>(text[i]);
         cur = nodes_[cur].next[ch]; // always defined after build()
-        std::cerr << "DEBUG state=" << cur << " ch=" << (int)ch << "\n";
         for (std::size_t pid : nodes_[cur].output) {
             matches.push_back(Match{pid, i});
         }

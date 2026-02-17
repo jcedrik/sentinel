@@ -82,12 +82,25 @@ static void test_binary_safe() {
     CHECK(m.size() == 1);
 }
 
+static void test_search_before_build_throws() {
+    AhoCorasick ac;
+    ac.add_pattern("x");
+    bool threw = false;
+    try {
+        ac.search("x");
+    } catch (const std::logic_error&) {
+        threw = true;
+    }
+    CHECK(threw);
+}
+
 int main() {
     test_single_match();
     test_multiple_patterns_overlap();
     test_multiple_occurrences();
     test_no_match();
     test_binary_safe();
+    test_search_before_build_throws();
     std::cout << "aho_corasick: all " << g_checks << " checks passed\n";
     return 0;
 }
