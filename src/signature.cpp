@@ -52,8 +52,10 @@ SignatureSet SignatureSet::load_from_string(const std::string& text) {
         while (std::getline(ls, cur, ';')) {
             fields.push_back(trim(cur));
         }
-        if (fields.size() < 4) {
-            throw std::runtime_error("bad rule line " + std::to_string(line_no));
+        if (fields.size() != 5) {
+            throw std::runtime_error(
+                "expected 5 fields (sid; severity; category; name; pattern) "
+                "on line " + std::to_string(line_no));
         }
 
         Signature sig;
@@ -61,7 +63,8 @@ SignatureSet SignatureSet::load_from_string(const std::string& text) {
         sig.sid = fields[0];
         sig.severity = severity_from_string(fields[1]);
         sig.category = fields[2];
-        sig.pattern = fields[3];
+        sig.name = fields[3];
+        sig.pattern = fields[4];
 
         if (sig.pattern.empty()) {
             throw std::runtime_error(
