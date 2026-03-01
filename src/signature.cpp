@@ -27,13 +27,66 @@ Severity severity_from_string(const std::string& s) {
 }
 
 namespace {
+// Trim leading/trailing ASCII whitespace.
 std::string trim(const std::string& s) {
     std::size_t a = s.find_first_not_of(" \t\r\n");
     if (a == std::string::npos) return "";
     std::size_t b = s.find_last_not_of(" \t\r\n");
     return s.substr(a, b - a + 1);
 }
+
+int hex_val(char c, int line_no) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    throw std::runtime_error(
+        "bad hex digit on line " + std::to_string(line_no));
+}
 } // namespace
+
+std::string SignatureSet::decode_pattern(const std::string& raw, int line_no) {
+    // Walk the pattern. Outside |..| we copy bytes verbatim. Inside, we read
+    // space-separated hex pairs and emit the corresponding bytes. This mirrors
+    // Snort/Suricata content syntax: "GET |0d 0a|" -> "GET\r\n".
+    std::string out;
+    bool in_hex = false;
+    std::string hex_acc;
+
+    for (std::size_t i = 0; i < raw.size(); ++i) {
+        char c = raw[i];
+        if (c == '|') {
+            in_hex = !in_hex;
+            if (!in_hex && !hex_acc.empty()) {
+                // closing a hex block that still has buffered text is fine;
+                // tokens were already flushed on spaces below
+            }
+            continue;
+        }
+        if (!in_hex) {
+            out.push_back(c);
+            continue;
+        }
+        // inside hex section
+        if (c == ' ') {
+            continue; // separators between byte tokens
+        }
+        // expect a pair of hex digits
+        if (i + 1 >= raw.size()) {
+            throw std::runtime_error(
+                "truncated hex byte on line " + std::to_string(line_no));
+        }
+        int hi = hex_val(c, line_no);
+        int lo = hex_val(raw[i + 1], line_no);
+        out.push_back(static_cast<char>((hi << 4) | lo));
+        ++i; // consumed two chars
+    }
+
+    if (in_hex) {
+        throw std::runtime_error(
+            "unterminated | hex block on line " + std::to_string(line_no));
+    }
+    return out;
+}
 
 SignatureSet SignatureSet::load_from_string(const std::string& text) {
     SignatureSet set;
@@ -46,6 +99,7 @@ SignatureSet SignatureSet::load_from_string(const std::string& text) {
         std::string t = trim(line);
         if (t.empty() || t[0] == '#') continue;
 
+        // Split on ';' into exactly 5 fields.
         std::vector<std::string> fields;
         std::string cur;
         std::istringstream ls(t);
@@ -64,7 +118,7 @@ SignatureSet SignatureSet::load_from_string(const std::string& text) {
         sig.severity = severity_from_string(fields[1]);
         sig.category = fields[2];
         sig.name = fields[3];
-        sig.pattern = fields[4];
+        sig.pattern = decode_pattern(fields[4], line_no);
 
         if (sig.pattern.empty()) {
             throw std::runtime_error(

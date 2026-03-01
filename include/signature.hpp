@@ -29,8 +29,9 @@ struct Signature {
 //
 //   sid; severity; category; name; pattern
 //
-// Fields are separated by semicolons. Lines starting with '#' and blank
-// lines are ignored.
+// Fields are separated by semicolons. The pattern may contain hex escapes of
+// the form |90 90 90| (Snort-style) to express non-printable bytes. Lines
+// starting with '#' and blank lines are ignored.
 //
 // Throws std::runtime_error on a malformed line, with the line number, so a
 // bad ruleset fails loudly instead of silently skipping detections.
@@ -47,6 +48,9 @@ public:
 
 private:
     std::vector<Signature> sigs_;
+
+    // Expand |..| hex escapes in a raw pattern field into actual bytes.
+    static std::string decode_pattern(const std::string& raw, int line_no);
 };
 
 } // namespace sentinel
