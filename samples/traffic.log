@@ -1,0 +1,9 @@
+GET /index.html HTTP/1.1 Host: example.com
+POST /login id=1 UNION SELECT password FROM users
+User-Agent: Nmap Scripting Engine 7.80
+GET /../../etc/passwd HTTP/1.1
+normal looking request with nothing bad
+<script>alert(document.cookie)</script>
+download of EICAR-STANDARD-ANTIVIRUS-TEST-FILE detected
+config leak AKIA1234567890ABCD
+just some regular log line here

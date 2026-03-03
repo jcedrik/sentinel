@@ -1,0 +1,8 @@
+# sentinel default ruleset
+# format: sid; severity; category; name; pattern
+
+SIG-1001; critical; malware; EICAR test signature; EICAR-STANDARD-ANTIVIRUS-TEST-FILE
+SIG-2002; hihg; exploit; Shellcode /bin/sh; /bin/sh
+SIG-3001; high; web; SQL injection UNION SELECT; UNION SELECT
+SIG-3002; medium; web; XSS script tag; <script>
+SIG-4001; low; recon; Nmap user agent; Nmap Scripting Engine
