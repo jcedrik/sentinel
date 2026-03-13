@@ -14,6 +14,7 @@ namespace {
 struct Args {
     std::string rules_path;
     std::string input_path;
+    bool json = false;
     bool ok = false;
     std::string error;
 };
@@ -28,6 +29,8 @@ Args parse_args(int argc, char** argv) {
         } else if (arg == "-i" || arg == "--input") {
             if (++i >= argc) { a.error = "missing value for --input"; return a; }
             a.input_path = argv[i];
+        } else if (arg == "--json") {
+            a.json = true;
         } else if (arg == "-h" || arg == "--help") {
             a.error = "help";
             return a;
@@ -48,10 +51,11 @@ void print_usage() {
     std::cout <<
         "sentinel - multi-signature detection engine\n\n"
         "Usage:\n"
-        "  sentinel --rules <file> --input <file>\n\n"
+        "  sentinel --rules <file> --input <file> [--json]\n\n"
         "Options:\n"
         "  -r, --rules <file>   signature ruleset to load\n"
         "  -i, --input <file>   input to scan (one record per line)\n"
+        "      --json           emit alerts as JSON\n"
         "  -h, --help           show this help\n\n"
         "Exit codes: 0 = no alerts, 1 = alerts found, 2 = error\n";
 }
@@ -66,6 +70,26 @@ const char* color_for(Severity s, bool use_color) {
         case Severity::Info: return "\033[90m";
     }
     return "";
+}
+
+void escape_json(const std::string& in, std::string& out) {
+    for (char c : in) {
+        switch (c) {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20) {
+                    char buf[8];
+                    std::snprintf(buf, sizeof(buf), "\\u%04x", c & 0xff);
+                    out += buf;
+                } else {
+                    out += c;
+                }
+        }
+    }
 }
 
 void print_text(const std::vector<Alert>& alerts, std::size_t sig_count,
@@ -100,6 +124,32 @@ void print_text(const std::vector<Alert>& alerts, std::size_t sig_count,
     }
 }
 
+void print_json(const std::vector<Alert>& alerts, std::size_t sig_count,
+                std::size_t rec_count) {
+    std::cout << "{\n";
+    std::cout << "  \"signatures_loaded\": " << sig_count << ",\n";
+    std::cout << "  \"records_scanned\": " << rec_count << ",\n";
+    std::cout << "  \"alert_count\": " << alerts.size() << ",\n";
+    std::cout << "  \"alerts\": [\n";
+    for (std::size_t i = 0; i < alerts.size(); ++i) {
+        const auto& a = alerts[i];
+        std::string name_e, sid_e, cat_e, src_e;
+        escape_json(a.signature.name, name_e);
+        escape_json(a.signature.sid, sid_e);
+        escape_json(a.signature.category, cat_e);
+        escape_json(a.source, src_e);
+        std::cout << "    {\n"
+                  << "      \"sid\": \"" << sid_e << "\",\n"
+                  << "      \"name\": \"" << name_e << "\",\n"
+                  << "      \"severity\": \"" << severity_name(a.signature.severity) << "\",\n"
+                  << "      \"category\": \"" << cat_e << "\",\n"
+                  << "      \"source\": \"" << src_e << "\",\n"
+                  << "      \"offset\": " << a.offset << "\n"
+                  << "    }" << (i + 1 < alerts.size() ? "," : "") << "\n";
+    }
+    std::cout << "  ]\n}\n";
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -121,8 +171,12 @@ int main(int argc, char** argv) {
         auto records = read_records_from_lines(args.input_path);
         auto alerts = engine.scan_all(records);
 
-        bool use_color = isatty(fileno(stdout));
-        print_text(alerts, sig_count, records.size(), use_color);
+        if (args.json) {
+            print_json(alerts, sig_count, records.size());
+        } else {
+            bool use_color = isatty(fileno(stdout));
+            print_text(alerts, sig_count, records.size(), use_color);
+        }
         return alerts.empty() ? 0 : 1;
     } catch (const std::exception& e) {
         std::cerr << "sentinel: " << e.what() << "\n";
