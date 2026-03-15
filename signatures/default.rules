@@ -1,8 +1,24 @@
 # sentinel default ruleset
 # format: sid; severity; category; name; pattern
+# pattern supports |hex| escapes for non-printable bytes (Snort-style)
 
+# --- malware / known-bad tokens ---
 SIG-1001; critical; malware; EICAR test signature; EICAR-STANDARD-ANTIVIRUS-TEST-FILE
-SIG-2002; hihg; exploit; Shellcode /bin/sh; /bin/sh
+SIG-1002; high; malware; Common webshell marker; eval(base64_decode(
+
+# --- exploitation ---
+SIG-2001; high; exploit; x86 NOP sled; |90 90 90 90 90 90|
+SIG-2002; high; exploit; Shellcode /bin/sh; /bin/sh
+SIG-2003; medium; exploit; Path traversal sequence; ../../
+
+# --- web attacks ---
 SIG-3001; high; web; SQL injection UNION SELECT; UNION SELECT
 SIG-3002; medium; web; XSS script tag; <script>
+SIG-3003; medium; web; CRLF header injection; |0d 0a|Set-Cookie
+
+# --- recon ---
 SIG-4001; low; recon; Nmap user agent; Nmap Scripting Engine
+SIG-4002; low; recon; sqlmap tool; sqlmap
+
+# --- data exfiltration ---
+SIG-5001; medium; exfil; AWS access key id; AKIA
