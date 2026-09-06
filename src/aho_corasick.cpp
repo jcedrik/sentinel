@@ -76,6 +76,46 @@ void AhoCorasick::build() {
         }
     }
 
+    // Compress: remap the 256-wide rows onto the symbols actually used.
+    bool used[256] = {};
+    for (const auto& n : nodes_) {
+        for (int ch = 0; ch < 256; ++ch) {
+            if (n.next[ch] != root() && n.next[ch] != -1) used[ch] = true;
+        }
+    }
+    // Symbol 0 is reserved for "byte in no pattern": it behaves exactly like
+    // any other absent edge, which after the goto construction is a defined
+    // transition (usually to the root, sometimes deeper via failure links).
+    // We still need a real byte to read that transition from, so pick one
+    // unused byte as the representative; if every byte is used, symbol 0 is
+    // simply never hit.
+    int representative = -1;
+    for (int ch = 0; ch < 256; ++ch) if (!used[ch]) { representative = ch; break; }
+    if (representative == -1) {
+        // Every byte value appears in some pattern (binary rulesets can do
+        // this). No compression possible: identity map, 256-wide rows.
+        alphabet_ = 256;
+        for (int ch = 0; ch < 256; ++ch) sym_[ch] = static_cast<uint8_t>(ch);
+    } else {
+        alphabet_ = 1;
+        for (int ch = 0; ch < 256; ++ch) {
+            if (used[ch]) sym_[ch] = static_cast<uint8_t>(alphabet_++);
+            else sym_[ch] = 0;
+        }
+    }
+    table_.assign(nodes_.size() * alphabet_, root());
+    outputs_.resize(nodes_.size());
+    for (std::size_t s = 0; s < nodes_.size(); ++s) {
+        for (int ch = 0; ch < 256; ++ch) {
+            if (used[ch]) table_[s * alphabet_ + sym_[ch]] = nodes_[s].next[ch];
+        }
+        if (representative >= 0) table_[s * alphabet_ + 0] = nodes_[s].next[representative];
+        outputs_[s] = nodes_[s].output;
+    }
+    // The 256-wide rows are no longer needed for searching. Free them so the
+    // automaton's resident size is the compact table, not the trie.
+    for (auto& n : nodes_) { std::vector<int>().swap(n.next); std::vector<std::size_t>().swap(n.output); }
+
     built_ = true;
 }
 
@@ -85,12 +125,15 @@ std::vector<Match> AhoCorasick::search(std::string_view text) const {
     }
 
     std::vector<Match> matches;
-    int cur = root();
+    const int32_t* table = table_.data();
+    const std::size_t a = alphabet_;
+    std::size_t cur = static_cast<std::size_t>(root());
     for (std::size_t i = 0; i < text.size(); ++i) {
-        unsigned char ch = static_cast<unsigned char>(text[i]);
-        cur = nodes_[cur].next[ch]; // always defined after build()
-        for (std::size_t pid : nodes_[cur].output) {
-            matches.push_back(Match{pid, i});
+        const unsigned char ch = static_cast<unsigned char>(text[i]);
+        cur = static_cast<std::size_t>(table[cur * a + sym_[ch]]); // one load per byte
+        const auto& out = outputs_[cur];
+        if (!out.empty()) {
+            for (std::size_t pid : out) matches.push_back(Match{pid, i});
         }
     }
     return matches;
