@@ -1,0 +1,9 @@
+patterns,engine,build_ms,scan_ms,mb_per_s,matches,table_mb,nodes,alphabet
+10,aho-corasick,0.2,119.1,268.6,1997,0.0,131,42
+10,naive-memmem,0.0,52.1,614.3,1997,,,
+100,aho-corasick,2.8,124.7,256.6,1998,0.3,1505,44
+100,naive-memmem,0.0,464.3,68.9,1998,,,
+1000,aho-corasick,17.0,237.3,134.9,1999,2.3,13835,44
+1000,naive-memmem,0.0,4414.2,7.2,2016,,,
+10000,aho-corasick,249.7,591.3,54.1,2003,22.0,131094,44
+10000,naive-memmem,0.0,42735.9,0.7,1872,,,
