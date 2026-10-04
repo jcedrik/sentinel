@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            cxx: g++
+          - os: macos-latest
+            cxx: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test
+        run: make test CXX=${{ matrix.cxx }}
+      - name: Sample must exit 1 (alerts present)
+        run: |
+          make CXX=${{ matrix.cxx }}
+          if ./sentinel --rules signatures/default.rules --input samples/traffic.log --json > /dev/null; then
+            echo "expected exit 1" && exit 1
+          fi
+
+  sanitizers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ASan + UBSan
+        run: make test CXXFLAGS="-std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Wall -Wextra -I include"
+
+  bench:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Throughput benchmark (8 MB, smoke)
+        run: |
+          g++ -std=c++17 -O3 -I include src/aho_corasick.cpp src/signature.cpp src/engine.cpp bench/bench.cpp -o bench_sentinel
+          ./bench_sentinel 8 | tee bench/ci-results.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: bench/ci-results.csv
