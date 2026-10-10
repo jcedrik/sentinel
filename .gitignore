@@ -1,5 +1,5 @@
 sentinel
 test_ac
 test_engine
+bench_sentinel
 *.o
-*.out
